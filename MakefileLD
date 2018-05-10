@@ -1,0 +1,254 @@
+#!/usr/bin/make -f
+
+# Adjust according to the number CPU cores to use for parallel build.
+# Default: Number of processors in /proc/cpuinfo, if present, or 1.
+NR_CPU := $(shell [ -f /proc/cpuinfo ] && grep -c '^processor\s*:' /proc/cpuinfo || echo 1)
+BB_NUMBER_THREADS ?= $(NR_CPU)
+PARALLEL_MAKE ?= -j $(NR_CPU)
+
+MACHINE = alien5
+MACHINEBUILD = alien5
+DISTRO = openvix
+export DISTRO
+
+DISTRO_VERSION=6.2
+export DISTRO_VERSION
+
+DISTRO_TYPE=release
+export DISTRO_TYPE
+
+XSUM ?= md5sum
+
+ONLINECHECK_URL ?= "http://www.zdf.de"
+ONLINECHECK_TIMEOUT ?= 2
+
+BUILD_DIR = $(CURDIR)/builds/$(DISTRO)/$(DISTRO_TYPE)/$(MACHINEBUILD)
+TOPDIR = $(BUILD_DIR)
+DL_DIR = $(CURDIR)/sources
+SSTATE_DIR = $(CURDIR)/builds/$(DISTRO)/sstate-cache
+TMPDIR = $(TOPDIR)/tmp
+DEPDIR = $(TOPDIR)/.deps
+MACHINEBUILD = $(MACHINE)
+export MACHINEBUILD
+
+BBLAYERS ?= \
+	$(CURDIR)/meta-local \
+	$(CURDIR)/openembedded-core/meta \
+	$(CURDIR)/meta-openembedded/meta-oe \
+	$(CURDIR)/meta-openembedded/meta-multimedia \
+	$(CURDIR)/meta-openembedded/meta-networking \
+	$(CURDIR)/meta-openembedded/meta-filesystems \
+	$(CURDIR)/meta-openembedded/meta-python \
+	$(CURDIR)/meta-openembedded/meta-webserver \
+	$(CURDIR)/meta-oe-alliance/meta-oe \
+	$(CURDIR)/meta-qt5 \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-airdigital \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-azbox \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-ax \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-blackbox \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-ceryon \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-cube \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-dags \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-dinobot \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-dream \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-ebox \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-edision \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-entwopia \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-formuler \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-fulan \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-gfutures \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-gigablue \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-ini \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-ixuss \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-broadmedia \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-odin \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-odroid \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-octagon \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-protek \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-skylake \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-tiviar \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-tripledot \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-ultramini \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-vuplus \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-xp \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-xtrend \
+	$(CURDIR)/meta-oe-alliance/meta-brands/meta-xcore \
+	$(CURDIR)/meta-linkdroid \
+
+
+CONFFILES = \
+	$(TOPDIR)/env.source \
+	$(TOPDIR)/conf/$(DISTRO).conf \
+	$(TOPDIR)/conf/bblayers.conf \
+	$(TOPDIR)/conf/local.conf \
+	$(TOPDIR)/conf/site.conf
+
+CONFDEPS = \
+	$(DEPDIR)/.env.source.$(BITBAKE_ENV_HASH) \
+	$(DEPDIR)/.$(DISTRO).conf.$($(DISTRO)_CONF_HASH) \
+	$(DEPDIR)/.bblayers.conf.$(BBLAYERS_CONF_HASH) \
+	$(DEPDIR)/.local.conf.$(LOCAL_CONF_HASH)
+
+GIT ?= git
+GIT_REMOTE := $(shell $(GIT) remote)
+GIT_USER_NAME := $(shell $(GIT) config user.name)
+GIT_USER_EMAIL := $(shell $(GIT) config user.email)
+
+hash = $(shell echo $(1) | $(XSUM) | awk '{print $$1}')
+
+.DEFAULT_GOAL := all
+all: init
+	@echo
+	@echo "Openembedded for the alien5 environment has been initialized"
+	@echo "properly. Now you can start building your image, by doing either:"
+	@echo
+	@echo "MACHINE=alien5 make image"
+	@echo "	or"
+	@echo "cd $(BUILD_DIR) ; source env.source ; MACHINE=$(MACHINE) MACHINEBUILD=$(MACHINEBUILD) bitbake $(DISTRO)-image"
+	@echo
+
+$(BBLAYERS):
+	[ -d $@ ] || $(MAKE) $(MFLAGS) update
+
+setupmbuild:
+ifeq ($(MACHINEBUILD),alien5)
+MACHINE=alien5
+MACHINEBUILD=alien5
+BRAND_OEM=Fulan
+endif
+
+export MACHINEBUILD
+export MACHINE
+export DISTRO
+
+initialize: init
+
+init: setupmbuild $(BBLAYERS) $(CONFFILES)
+
+image: init
+	@. $(TOPDIR)/env.source && cd $(TOPDIR) && bitbake $(DISTRO)-image
+
+clean:
+	@. $(TOPDIR)/env.source && cd $(TOPDIR) && echo -n -e "Performing a clean \e[95mPlease wait... " && bitbake -qqq -c clean $(DISTRO)-image && echo -n -e "\e[93mClean completed.\e[0m"
+
+image_tmp: init
+	@. $(TOPDIR)/env.source && cd $(TOPDIR) && rm -rf tmp && bitbake $(DISTRO)-image
+
+
+update:
+	@echo 'Updating Git repositories...'
+	@HASH=`$(XSUM) $(MAKEFILE_LIST)`; \
+	if [ -n "$(GIT_REMOTE)" ]; then \
+		$(GIT) pull --ff-only || $(GIT) pull --rebase; \
+	fi; \
+	if [ "$$HASH" != "`$(XSUM) $(MAKEFILE_LIST)`" ]; then \
+		echo 'Makefile changed. Restarting...'; \
+		$(MAKE) $(MFLAGS) --no-print-directory $(MAKECMDGOALS); \
+	else \
+		$(GIT) submodule sync && \
+		$(GIT) submodule update --init --recursive && \
+		cd meta-oe-alliance  && \
+		if [ -n "$(GIT_REMOTE)" ]; then \
+			$(GIT) submodule sync && \
+			$(GIT) submodule update --init; \
+		fi; \
+		echo "The oe-alliance is now up-to-date." ; \
+		cd .. ; \
+	fi
+
+.PHONY: all image init initialize update usage machinebuild
+
+BITBAKE_ENV_HASH := $(call hash, \
+	'BITBAKE_ENV_VERSION = "0"' \
+	'CURDIR = "$(CURDIR)"' \
+	'MACHINEBUILD2 = "${MACHINEBUILD}"' \
+	)
+
+$(TOPDIR)/env.source: $(DEPDIR)/.env.source.$(BITBAKE_ENV_HASH)
+	@echo 'Generating $@'
+	@echo 'export BB_ENV_EXTRAWHITE="MACHINE DISTRO MACHINEBUILD BB_SRCREV_POLICY BB_NO_NETWORK"' > $@
+	@echo 'export MACHINE=$(MACHINE)' >> $@
+	@echo 'export DISTRO=$(DISTRO)' >> $@
+	@echo 'export MACHINEBUILD=$(MACHINEBUILD)' >> $@
+	@echo 'export PATH=$(CURDIR)/openembedded-core/scripts:$(CURDIR)/bitbake/bin:$${PATH}' >> $@
+	@echo 'if [[ $$BB_NO_NETWORK -eq 1 ]]; then' >> $@
+	@echo ' export BB_SRCREV_POLICY="cache"' >> $@
+	@echo ' echo -e "\e[95mforced offline mode\e[0m"' >> $@
+	@echo 'else' >> $@
+	@echo ' echo -n -e "check internet connection: \e[93mWaiting ...\e[0m"' >> $@
+	@echo ' wget -q --tries=10 --timeout=$(ONLINECHECK_TIMEOUT) --spider $(ONLINECHECK_URL)' >> $@
+	@echo ' if [[ $$? -eq 0 ]]; then' >> $@
+	@echo '  echo -e "\b\b\b\b\b\b\b\b\b\b\b\e[32mOnline      \e[0m"' >> $@
+	@echo ' else' >> $@
+	@echo '  echo -e "\b\b\b\b\b\b\b\b\b\b\b\e[31mOffline     \e[0m"' >> $@
+	@echo '  export BB_SRCREV_POLICY="cache"' >> $@
+	@echo ' fi' >> $@
+	@echo 'fi' >> $@
+
+$(DISTRO)_CONF_HASH := $(call hash, \
+	'$(DISTRO)_CONF_VERSION = "1"' \
+	'CURDIR = "$(CURDIR)"' \
+	'BB_NUMBER_THREADS = "$(BB_NUMBER_THREADS)"' \
+	'PARALLEL_MAKE = "$(PARALLEL_MAKE)"' \
+	'DL_DIR = "$(DL_DIR)"' \
+	'SSTATE_DIR = "$(SSTATE_DIR)"' \
+	'TMPDIR = "$(TMPDIR)"' \
+	)
+
+$(TOPDIR)/conf/$(DISTRO).conf: $(DEPDIR)/.$(DISTRO).conf.$($(DISTRO)_CONF_HASH)
+	@echo 'Generating $@'
+	@test -d $(@D) || mkdir -p $(@D)
+	@echo 'DISTRO_TYPE = "$(DISTRO_TYPE)"' >> $@
+	@echo 'SSTATE_DIR = "$(SSTATE_DIR)"' >> $@
+	@echo 'TMPDIR = "$(TMPDIR)"' >> $@
+	@echo 'BB_GENERATE_MIRROR_TARBALLS = "1"' >> $@
+	@echo 'BBINCLUDELOGS = "yes"' >> $@
+	@echo 'CONF_VERSION = "1"' >> $@
+	@echo 'EXTRA_IMAGE_FEATURES = "debug-tweaks"' >> $@
+	@echo 'USER_CLASSES = "buildstats"' >> $@
+	@echo '#PRSERV_HOST = "localhost:0"' >> $@
+	@echo 'DISTRO = "openvix"' >> $@
+	@echo 'MACHINE = "$(MACHINE)"' >> $@
+	@echo 'MACHINEBUILD = "$(MACHINEBUILD)"' >> $@
+
+
+LOCAL_CONF_HASH := $(call hash, \
+	'LOCAL_CONF_VERSION = "0"' \
+	'CURDIR = "$(CURDIR)"' \
+	'TOPDIR = "$(TOPDIR)"' \
+	)
+
+$(TOPDIR)/conf/local.conf: $(DEPDIR)/.local.conf.$(LOCAL_CONF_HASH)
+	@echo 'Generating $@'
+	@test -d $(@D) || mkdir -p $(@D)
+	@echo 'TOPDIR = "$(TOPDIR)"' > $@
+	@echo 'require $(TOPDIR)/conf/$(DISTRO).conf' >> $@
+
+$(TOPDIR)/conf/site.conf: $(CURDIR)/site.conf
+	@ln -s ../../../../../site.conf $@
+
+$(CURDIR)/site.conf:
+	@echo 'SCONF_VERSION = "1"' >> $@
+	@echo 'BB_NUMBER_THREADS = "$(BB_NUMBER_THREADS)"' >> $@
+	@echo 'PARALLEL_MAKE = "$(PARALLEL_MAKE)"' >> $@
+	@echo 'BUILD_OPTIMIZATION = "-march=native -O2 -pipe"' >> $@
+	@echo 'DL_DIR = "$(DL_DIR)"' >> $@
+	@echo 'INHERIT += "rm_work"' >> $@
+
+BBLAYERS_CONF_HASH := $(call hash, \
+	'BBLAYERS_CONF_VERSION = "5"' \
+	'CURDIR = "$(CURDIR)"' \
+	'BBLAYERS = "$(BBLAYERS)"' \
+	)
+
+$(TOPDIR)/conf/bblayers.conf: $(DEPDIR)/.bblayers.conf.$(BBLAYERS_CONF_HASH)
+	@echo 'Generating $@'
+	@test -d $(@D) || mkdir -p $(@D)
+	@echo 'LCONF_VERSION = "4"' > $@
+	@echo 'BBFILES = ""' >> $@
+	@echo 'BBLAYERS = "$(BBLAYERS)"' >> $@
+
+$(CONFDEPS):
+	@test -d $(@D) || mkdir -p $(@D)
+	@$(RM) $(basename $@).*
+	@touch $@

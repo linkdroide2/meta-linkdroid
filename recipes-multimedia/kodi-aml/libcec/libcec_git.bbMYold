@@ -1,0 +1,41 @@
+SUMMARY = "USB CEC Adaptor communication Library"
+HOMEPAGE = "http://libcec.pulse-eight.com/"
+
+LICENSE = "GPLv2+"
+LIC_FILES_CHKSUM = "file://COPYING;md5=e61fd86f9c947b430126181da2c6c715"
+
+DEPENDS = "udev lockdev p8-platform"
+
+PV = "2.1.5"
+
+# for more recent version
+#SRCREV = "6d68d21243aa92862592435e8396b4280ea46c3f"
+#SRC_URI = "https://github.com/Pulse-Eight/libcec/archive/6d68d21.tar.gz
+
+# OEA version
+#SRCREV = "81e38211724bc6e8bd7a60f484433053ed682635"
+#SRC_URI = "git://github.com/Pulse-Eight/libcec.git;branch=release"
+
+SRC_URI[md5sum] = "ad71a3f0fea7bb9fda618e0edfbaabf3"
+SRC_URI[sha256sum] = "cb80d0b2b817b0a1cc49cfb7302d4d44cae9a06355873f56c84cd438ffba9bf2"
+
+SRC_URI = "https://github.com/Pulse-Eight/libcec/archive/6d68d21.tar.gz \
+           file://libcec-00-amlogic-support.patch \ 
+"
+
+S = "${WORKDIR}/libcec-6d68d21243aa92862592435e8396b4280ea46c3f"
+
+inherit cmake  pkgconfig
+
+EXTRA_OECMAKE = '  -DHAVE_AMLOGIC_API=1 \
+                '
+
+
+# cec-client and xbmc need the .so present to work :(
+FILES_${PN} += "${libdir}/*.so"
+FILES_${PN} += "${libdir}/python2.7/dist-packages/cec/*"
+INSANE_SKIP_${PN} = "dev-so"
+
+# Adapter shows up as a CDC-ACM device
+RRECOMMENDS_${PN} = "kernel-module-cdc-acm"
+
