@@ -18,7 +18,7 @@ inherit kernel machine_kernel_pr
 KV = "3.14.29"
 PV = "${KV}"
 LOCALVERSION ?= ""
-MACHINE_KERNEL_PR_append = ".4"
+MACHINE_KERNEL_PR_append = ".5"
 
 
 
