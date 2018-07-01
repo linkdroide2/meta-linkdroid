@@ -20,6 +20,7 @@ int aml_close(void);
 void aml_pause(void);
 void aml_resume(void);
 void aml_change_apid(int, int);
+void aml_change_vpid(int, int);
 int aml_get_pts(void);
 int aml_setAvsyncEnable(int);
 int aml_osdBlank(int);
