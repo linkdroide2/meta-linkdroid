@@ -50,4 +50,19 @@ do_configure_prepend_openvix() {
     cp -f ${WORKDIR}/About.py  ${S}/lib/python/Screens/
 }
 
+###############################################
+
+SRC_URI_append_pure2 = " \
+    file://configure.ac \
+    file://actions64-bit.patch \
+    "
+
+do_configure_prepend_pure2() {
+#    cp -f ${WORKDIR}/configure.ac  ${S}/
+#    cp -f ${WORKDIR}/AVSwitch.py  ${S}/lib/python/Components/
+#    cp -f ${WORKDIR}/Lcd.py  ${S}/lib/python/Components/
+#    cp -f ${WORKDIR}/servicemp3.cpp  ${S}/lib/service/
+#    cp -f ${WORKDIR}/amldecoder.cpp   ${S}/lib/dvb/
+#    cp -f ${WORKDIR}/amldecoder.h   ${S}/lib/dvb/
+}
 
